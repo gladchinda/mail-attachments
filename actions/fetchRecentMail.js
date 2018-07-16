@@ -1,5 +1,7 @@
 const fs = require('fs');
+const _ = require('lodash');
 const path = require('path');
+const XLSX = require('xlsx');
 const Busboy = require('busboy');
 const inspect = require('util').inspect;
 const httpHeaders = require('http-headers');
@@ -15,7 +17,8 @@ module.exports = ({ imap, box }) => {
 
 		f.on('message', function (msg, seqno) {
 
-			var busboy = null;
+			// var busboy = null;
+			let buffer = '';
 
 			console.log('Message #%d', seqno);
 			var prefix = '(#' + seqno + ') ';
@@ -25,9 +28,9 @@ module.exports = ({ imap, box }) => {
 				// let boundary = null;
 				// let buffer = '';
 
-				// stream.on('data', (chunk) => {
-				// 	buffer += chunk.toString('utf8');
-				// });
+				stream.on('data', (chunk) => {
+					buffer += chunk.toString('utf8');
+				});
 
 				// stream.on('end', () => {
 				// 	if (info.which !== 'TEXT') {
@@ -61,7 +64,7 @@ module.exports = ({ imap, box }) => {
 				// });
 
 				// busboy && stream.pipe(busboy);
-				stream.pipe(fs.createWriteStream('msg-' + seqno + '-body.txt'));
+				// stream.pipe(fs.createWriteStream('msg-' + seqno + '-body.txt'));
 
 			});
 
@@ -72,7 +75,8 @@ module.exports = ({ imap, box }) => {
 			msg.once('end', function () {
 				console.log(prefix + 'Finished');
 
-				const mailData = fs.readFileSync(path.join(__dirname, '..', 'msg-' + seqno + '-body.txt')).toString('utf8');
+				// const mailData = fs.readFileSync(path.join(__dirname, '..', 'msg-' + seqno + '-body.txt')).toString('utf8');
+				const mailData = buffer;
 
 				const headers = httpHeaders(mailData);
 				let [, boundary = ''] = (headers['content-type'] || '').match(/^.*?boundary="(.+)".*?$/) || [];
@@ -82,7 +86,45 @@ module.exports = ({ imap, box }) => {
 				const partsRegex = new RegExp(`(?<=\\\s+${boundary})([\\s\\S]+?)(?=${boundary})`, 'ig');
 				const parts = mailData.match(partsRegex) || [];
 
-				console.log(parts.map(part => httpHeaders(part)));
+				const typeRegex = /^\s*(.*?)(?=\;.*)/;
+				const bodyRegex = /(?<=\r\n\r\n)([\s\S]+)/ig;
+
+				const attachments = parts.filter(part => {
+					const headers = httpHeaders(part);
+					let [, type = ''] = (headers['content-type'] || '').match(typeRegex) || [];
+					return type.toLowerCase() === 'application/octet-stream';
+				});
+
+				console.log(attachments.map((part, index) => {
+					const [ body = '' ] = part.match(bodyRegex) || [];
+					const buffer = Buffer.from(body.replace(/(\r\n)/g, ''), 'base64');
+					const file = fs.openSync(path.join(__dirname, '..', `attachment-${index + 1}.xlsx`), 'w+');
+
+					fs.writeFileSync(file, buffer);
+					fs.closeSync(file);
+
+					const wb = XLSX.read(buffer);
+					const sheet = wb.Sheets[wb.SheetNames[0]];
+
+					const rows = XLSX.utils.sheet_to_json(sheet, { header: 'A' });
+
+					const [head, ...data] = rows.filter(row => {
+						return Object.keys(row).length > 1;
+					});
+
+					return data.map(row => {
+						return Object.keys(row).reduce((obj, key) => {
+							let field = head[key];
+							if (field) {
+								field = _.snakeCase(field);
+								obj = { ...obj, [field]: row[key] };
+							}
+							return obj;
+						}, {});
+					})
+
+					// return buffer;
+				}));
 			});
 
 		});
