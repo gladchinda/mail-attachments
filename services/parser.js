@@ -1,4 +1,5 @@
 const _ = require('lodash');
+const path = require('path');
 const XLSX = require('xlsx');
 const httpHeaders = require('http-headers');
 
@@ -11,7 +12,7 @@ const getMultipartBoundary = headers => {
 	return null;
 }
 
-const getMessageParts = message => {
+const getMessageParts = (message = '') => {
 	const headers = httpHeaders(message);
 	const boundary = getMultipartBoundary(headers);
 
@@ -113,6 +114,15 @@ const getMessageAttachmentParts = message => {
 	});
 }
 
+const getMessageExcelFileAttachments = message => {
+	const attachments = getMessageAttachmentParts(message);
+
+	return attachments.filter(attachment => {
+		const { filename = '' } = attachment;
+		return filename && path.extname(filename).toLowerCase() === '.xlsx';
+	});
+}
+
 const extractRecordsFromSheetData = buffer => {
 	const wb = XLSX.read(buffer);
 	const sheetname = wb.SheetNames[0];
@@ -144,5 +154,6 @@ module.exports = {
 	getMessageParts,
 	getMultipartBoundary,
 	getMessageAttachmentParts,
-	extractRecordsFromSheetData
+	extractRecordsFromSheetData,
+	getMessageExcelFileAttachments
 };

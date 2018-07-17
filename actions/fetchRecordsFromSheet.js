@@ -1,17 +1,18 @@
 const _ = require('lodash');
 const Parser = require('../services/parser');
 
-module.exports = ({ imap, box }) => {
+module.exports = ({ imap, box }) => new Promise((resolve, reject) => {
 
 	const criteria = ['ALL', ['SINCE', 'July 01, 2018'], ['FROM', 'omniecobank@flutterwavego.com']];
 
 	imap.search(criteria, (err, results) => {
 
-		if (err) throw err;
+		if (err) reject(err);
 
+		const fetchedRecords = [];
 		const f = imap.fetch(results, { bodies: '', struct: true });
 
-		f.on('message', function (msg, seqno) {
+		f.on('message', (msg, seqno) => {
 
 			let mail = Buffer.from('');
 
@@ -24,22 +25,30 @@ module.exports = ({ imap, box }) => {
 			msg.once('attributes', attrs => { /* log mail attributes */ });
 
 			msg.once('end', () => {
-				const attachments = Parser.getMessageAttachmentParts(mail);
+				const message = mail.toString('utf8');
+				const attachments = Parser.getMessageExcelFileAttachments(message);
 
 				const records = attachments.map(attachment => {
 					const { buffer: data } = attachment;
-					return Parser.extractRecordsFromSheetData(data);
+					const { records = [] } = Parser.extractRecordsFromSheetData(data);
+					return records;
 				});
+
+				fetchedRecords.push(_.flatten(records));
 			});
 
 		});
 
-		f.once('error', err => { /* handle fetch message error */ });
+		f.once('error', err => {
+			// handle fetch message error
+			reject(err);
+		});
 
 		f.once('end', () => {
 			imap.end();
+			resolve(_.flatten(fetchedRecords));
 		});
 
 	});
 
-}
+});
