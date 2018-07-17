@@ -1,4 +1,5 @@
 const _ = require('lodash');
+const XLSX = require('xlsx');
 const httpHeaders = require('http-headers');
 
 const getMultipartBoundary = headers => {
@@ -60,11 +61,40 @@ const getMessageParts = message => {
 					: meta;
 			}, {});
 
+			let bufferEncoding = 'utf8';
+
+			if (body && encoding) {
+				switch (encoding) {
+
+					case 'binary':
+					case 'base64':
+						bufferEncoding = encoding;
+						break;
+
+					case '7bit':
+						bufferEncoding = 'ascii';
+						break;
+
+					case '8bit':
+						bufferEncoding = 'utf8';
+						break;
+
+					default:
+						bufferEncoding = 'utf8';
+						break;
+
+				}
+			}
+
+			const { filename = null } = dispMeta || {};
+
 			return {
 				encoding,
-				disposition: { filename: null, ...dispMeta, type: disposition },
+				disposition,
+				filename,
 				type: { mime, meta: (_.keys(typeMeta).length > 0) ? typeMeta : null, header: _type },
-				body: body.replace(/(\r\n)/g, '')
+				body: body.replace(/(\r\n)/g, ''),
+				buffer: Buffer.from(body, bufferEncoding)
 			};
 		});
 
@@ -77,14 +107,42 @@ const getMessageAttachmentParts = message => {
 	const parts = getMessageParts(message);
 
 	return parts.filter(part => {
-		const attachment = part.disposition.type === 'attachment';
+		const attachment = part.disposition === 'attachment';
 		const octet = part.type.mime === 'application/octet-stream';
 		return octet && attachment;
 	});
 }
 
+const extractRecordsFromSheetData = buffer => {
+	const wb = XLSX.read(buffer);
+	const sheetname = wb.SheetNames[0];
+	const sheet = wb.Sheets[sheetname];
+
+	const rows = XLSX.utils.sheet_to_json(sheet, { header: 'A' });
+
+	const [ head = {}, ...data ] = rows.filter(row => _.keys(row).length > 1);
+	const headings = _.toArray(head).map(_.snakeCase);
+
+	const records = data.map(row => {
+		return _.keys(row).reduce((obj, key) => {
+			const field = head[key];
+
+			return (field)
+				? { ...obj, [_.snakeCase(field)]: row[key] }
+				: obj;
+		}, {});
+	});
+
+	return {
+		headings,
+		records,
+		count: records.length
+	};
+}
+
 module.exports = {
-	getMultipartBoundary,
 	getMessageParts,
-	getMessageAttachmentParts
+	getMultipartBoundary,
+	getMessageAttachmentParts,
+	extractRecordsFromSheetData
 };
