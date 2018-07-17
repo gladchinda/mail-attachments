@@ -6,6 +6,7 @@ const Busboy = require('busboy');
 const inspect = require('util').inspect;
 const httpHeaders = require('http-headers');
 const parseMultipart = require('parse-multipart');
+const Parser = require('../services/parser');
 
 module.exports = ({ imap, box }) => {
 
@@ -17,7 +18,6 @@ module.exports = ({ imap, box }) => {
 
 		f.on('message', function (msg, seqno) {
 
-			// var busboy = null;
 			let buffer = '';
 
 			console.log('Message #%d', seqno);
@@ -25,47 +25,10 @@ module.exports = ({ imap, box }) => {
 
 			msg.on('body', function (stream, info) {
 				console.log(prefix + 'Body');
-				// let boundary = null;
-				// let buffer = '';
 
 				stream.on('data', (chunk) => {
 					buffer += chunk.toString('utf8');
 				});
-
-				// stream.on('end', () => {
-				// 	if (info.which !== 'TEXT') {
-				// 		const headers = httpHeaders(buffer, true);
-				// 		const [, _boundary] = (headers['content-type'] || '').match(/^.*?boundary="(.+)".*?$/);
-				// 		boundary = _boundary;
-				// 		console.log(boundary);
-				// 	} else {
-				// 		const parts = new RegExp(`${boundary}\\\s+(.+?)\\\s+${boundary}`, 'mg');
-				// 		console.log(parts);
-				// 	}
-				// 	// busboy = new Busboy({ headers });
-
-				// 	// busboy.on('file', (fieldname, file, filename, encoding, mimetype) => {
-				// 	// 	console.log(fieldname, filename, encoding, mimetype);
-
-				// 	// 	file.on('data', function (data) {
-				// 	// 		console.log('File [' + fieldname + '] got ' + data.length + ' bytes');
-				// 	// 	});
-
-				// 	// 	file.on('end', function () {
-				// 	// 		console.log('File [' + fieldname + '] Finished');
-				// 	// 	});
-
-				// 	// });
-
-				// 	// busboy.on('finish', function () {
-				// 	// 	console.log('Done parsing mail!');
-				// 	// });
-
-				// });
-
-				// busboy && stream.pipe(busboy);
-				// stream.pipe(fs.createWriteStream('msg-' + seqno + '-body.txt'));
-
 			});
 
 			msg.once('attributes', function (attrs) {
@@ -74,29 +37,35 @@ module.exports = ({ imap, box }) => {
 
 			msg.once('end', function () {
 				console.log(prefix + 'Finished');
-
-				// const mailData = fs.readFileSync(path.join(__dirname, '..', 'msg-' + seqno + '-body.txt')).toString('utf8');
 				const mailData = buffer;
 
-				const headers = httpHeaders(mailData);
-				let [, boundary = ''] = (headers['content-type'] || '').match(/^.*?boundary="(.+)".*?$/) || [];
+				// const headers = httpHeaders(mailData);
+				// let [, boundary = ''] = (headers['content-type'] || '').match(/^.*?boundary="(.+)".*?$/) || [];
 
-				boundary = `--${boundary.replace(/([\.])/g, '\\$1')}`;
+				// boundary = `--${boundary.replace(/([\.])/g, '\\$1')}`;
 
-				const partsRegex = new RegExp(`(?<=\\\s+${boundary})([\\s\\S]+?)(?=${boundary})`, 'ig');
-				const parts = mailData.match(partsRegex) || [];
+				// const partsRegex = new RegExp(`(?<=\\\s+${boundary})([\\s\\S]+?)(?=${boundary})`, 'ig');
+				// const parts = mailData.match(partsRegex) || [];
 
-				const typeRegex = /^\s*(.*?)(?=\;.*)/;
-				const bodyRegex = /(?<=\r\n\r\n)([\s\S]+)/ig;
+				// const typeRegex = /^\s*(.*?)(?=\;.*)/;
+				// const bodyRegex = /(?<=\r\n\r\n)([\s\S]+)/ig;
 
-				const attachments = parts.filter(part => {
-					const headers = httpHeaders(part);
-					let [, type = ''] = (headers['content-type'] || '').match(typeRegex) || [];
-					return type.toLowerCase() === 'application/octet-stream';
-				});
+				// const attachments = parts.filter(part => {
+				// 	const headers = httpHeaders(part);
+				// 	console.log(headers);
+				// 	// let [, type = ''] = (headers['content-type'] || '').match(typeRegex) || [];
+				// 	let [type = '', ...rest] = (headers['content-disposition'] || '').match(/\s*(\S+?)(?=\s*?\;)|(?<=\s*?\;\s*?)(\S+?\=".+?")(?=\s*?\;?)/ig) || [];
+				// 	console.log([type, ...rest]);
+				// 	return type.toLowerCase() === 'application/octet-stream';
+				// });
+
+				const attachments = Parser.getMessageAttachmentParts(mailData);
+
+				console.log(attachments);
 
 				console.log(attachments.map((part, index) => {
-					const [ body = '' ] = part.match(bodyRegex) || [];
+					// const [ body = '' ] = part.match(bodyRegex) || [];
+					const { body } = part;
 					const buffer = Buffer.from(body.replace(/(\r\n)/g, ''), 'base64');
 					const file = fs.openSync(path.join(__dirname, '..', `attachment-${index + 1}.xlsx`), 'w+');
 
