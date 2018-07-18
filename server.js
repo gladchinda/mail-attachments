@@ -1,7 +1,7 @@
 const express = require('express');
 const dotenv = require('dotenv').config();
-const MailService = require('./services/mail');
-const fetchRecordsFromSheet = require('./actions/fetchRecordsFromSheet');
+const Mail = require('./app/services/Mail');
+const fetchRecordsFromSheet = require('./app/helpers/actions/fetchRecordsFromSheet');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -9,7 +9,7 @@ const PORT = process.env.PORT || 5000;
 app.set('port', PORT);
 
 app.get('/records', (req, res) => {
-	MailService.open()
+	Mail.open()
 		.then(fetchRecordsFromSheet)
 		.then(records => res.json({ status: 'success', data: { count: records.length, records } }))
 		.catch(err => {
