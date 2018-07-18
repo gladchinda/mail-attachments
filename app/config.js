@@ -27,10 +27,10 @@ module.exports = {
 	mail: {
 		imap: {
 			'default': {
-				user: env(MAIL_IMAP_USERNAME, null),
-				password: env(MAIL_IMAP_PASSWORD, ''),
-				host: env(MAIL_IMAP_HOST, null),
-				port: env(MAIL_IMAP_PORT, 993),
+				user: env('MAIL_IMAP_USERNAME', null),
+				password: env('MAIL_IMAP_PASSWORD', ''),
+				host: env('MAIL_IMAP_HOST', null),
+				port: env('MAIL_IMAP_PORT', 993),
 				tls: true
 			}
 		}
