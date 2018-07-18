@@ -15,7 +15,10 @@
     "http-headers": "^3.0.2",
     "imap": "^0.8.19",
     "lodash": "^4.17.10",
+    "moment": "^2.22.2",
     "mysql": "^2.16.0",
+    "winston": "^3.0.0",
+    "winston-daily-rotate-file": "^3.3.0",
     "xlsx": "^0.13.2"
   }
 }
