@@ -1,12 +1,7 @@
 const Imap = require('imap');
+const Config = require('../config').mail;
 
-const imap = new Imap({
-	user: process.env.EMAIL_USERNAME,
-	password: process.env.EMAIL_PASSWORD,
-	host: process.env.EMAIL_HOST,
-	port: process.env.EMAIL_PORT || 993,
-	tls: true
-});
+const imap = new Imap(Config.imap.default);
 
 const connectAndOpenInbox = () => new Promise((resolve, reject) => {
 
