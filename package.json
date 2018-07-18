@@ -10,13 +10,11 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "busboy": "^0.2.14",
     "dotenv": "^6.0.0",
     "express": "^4.16.3",
     "http-headers": "^3.0.2",
     "imap": "^0.8.19",
     "lodash": "^4.17.10",
-    "parse-multipart": "^1.0.4",
     "xlsx": "^0.13.2"
   }
 }
